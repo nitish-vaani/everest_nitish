@@ -17,14 +17,13 @@ def get_openai_llm():
     api_key = config_manager.get_openai_api_key()
     
     try:
-        # For project-specific keys, we might need to handle differently
+        
         if api_key.startswith("sk-proj-"):
             logger.info("Using project-specific OpenAI API key")
         
-        # Use basic configuration without unsupported parameters
         llm_instance = openai.LLM(
-            # model="gpt-3.5-turbo",  # More reliable and supported model
-            model="gpt-4o",  # Use gpt-4o for better performance
+            # model="gpt-3.5-turbo",  
+            model="gpt-4o",  
             api_key=api_key
         )
         

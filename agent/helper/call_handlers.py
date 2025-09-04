@@ -28,13 +28,13 @@ class CallState:
 
 async def handle_outbound_sip_call(ctx, phone_number: str, participant_identity: str, 
                                  dial_info: Dict[str, Any], agent_name: str, call_state: CallState) -> Optional[rtc.RemoteParticipant]:
-    """Handle outbound SIP call with proper state tracking"""
-    logger.info(f"Creating SIP participant for outbound call to {phone_number}")
+    """Handle outbound SIP call with cleaner logging"""
+    logger.info(f"Initiating call to {phone_number}")
     
     try:
         outbound_trunk_id = config_manager.get_sip_trunk_id()
         
-        # Create SIP participant with wait_until_answered=False for better control
+        # Create SIP participant
         await ctx.api.sip.create_sip_participant(
             api.CreateSIPParticipantRequest(
                 room_name=ctx.room.name,
@@ -49,18 +49,22 @@ async def handle_outbound_sip_call(ctx, phone_number: str, participant_identity:
         participant = await ctx.wait_for_participant(identity=participant_identity)
         logger.info(f"Participant joined: {participant.identity}")
         
-        # Monitor call state with timeout
+        # Monitor call state with timeout - REDUCED LOGGING
         start_time = perf_counter()
-        timeout = 45  # 45 second timeout
-        last_status = None  # Track status changes to reduce log noise
+        timeout = 45
+        last_status = None
+        status_change_count = 0  # Track how many times status changed
         
         while perf_counter() - start_time < timeout:
             call_status = participant.attributes.get("sip.callStatus")
             disconnect_reason = participant.disconnect_reason
             
-            # Only log when status changes to reduce noise
+            # Only log status changes, but limit frequency
             if call_status != last_status:
-                logger.info(f"Call status changed: {call_status}, Disconnect reason: {disconnect_reason}")
+                status_change_count += 1
+                # Log first few status changes, then only important ones
+                if status_change_count <= 3 or call_status in ["active", "failed", "busy", "no-answer"]:
+                    logger.info(f"Call status: {call_status}")
                 last_status = call_status
             
             if call_status == "active":
@@ -68,7 +72,6 @@ async def handle_outbound_sip_call(ctx, phone_number: str, participant_identity:
                 call_state.call_started = True
                 call_state.start_time = datetime.now()
                 
-                # Use async database operation
                 await insert_call_start_async(
                     ctx.room.name, agent_name, "started", dial_info,
                     dial_info.get('name', "Outbound Call"),
@@ -77,11 +80,10 @@ async def handle_outbound_sip_call(ctx, phone_number: str, participant_identity:
                     "Outbound",
                     dial_info.get('user_id', 0)
                 )
-                logger.info("User has picked up - Call started")
+                logger.info("Call connected successfully")
                 return participant
                 
             elif disconnect_reason == rtc.DisconnectReason.USER_REJECTED:
-                # User rejected the call
                 await insert_call_start_async(
                     ctx.room.name, agent_name, "Call rejected", dial_info,
                     dial_info.get('name', "Outbound Call"),
@@ -90,12 +92,11 @@ async def handle_outbound_sip_call(ctx, phone_number: str, participant_identity:
                     "Outbound",
                     dial_info.get('user_id', 0)
                 )
-                logger.info("User rejected the call")
+                logger.info("Call rejected by user")
                 ctx.shutdown()
                 return None
                 
             elif disconnect_reason == rtc.DisconnectReason.USER_UNAVAILABLE:
-                # User did not pick up
                 await insert_call_start_async(
                     ctx.room.name, agent_name, "User did not pick", dial_info,
                     dial_info.get('name', "Outbound Call"),
@@ -104,15 +105,14 @@ async def handle_outbound_sip_call(ctx, phone_number: str, participant_identity:
                     "Outbound",
                     dial_info.get('user_id', 0)
                 )
-                logger.info("User did not pick up")
+                logger.info("User unavailable")
                 ctx.shutdown()
                 return None
                 
             elif call_status in ["failed", "busy", "no-answer"]:
-                # Call failed for various reasons
                 reason_map = {
                     "failed": "Call failed",
-                    "busy": "User busy",
+                    "busy": "User busy", 
                     "no-answer": "User did not pick"
                 }
                 status = reason_map.get(call_status, f"Call {call_status}")
@@ -129,7 +129,7 @@ async def handle_outbound_sip_call(ctx, phone_number: str, participant_identity:
                 ctx.shutdown()
                 return None
             
-            # Wait a bit before checking again
+            # Wait before checking again
             await asyncio.sleep(0.5)
         
         # Timeout reached
@@ -141,7 +141,7 @@ async def handle_outbound_sip_call(ctx, phone_number: str, participant_identity:
             "Outbound",
             dial_info.get('user_id', 0)
         )
-        logger.info("Call timed out")
+        logger.warning("Call timed out after 45 seconds")
         ctx.shutdown()
         return None
         
@@ -149,9 +149,9 @@ async def handle_outbound_sip_call(ctx, phone_number: str, participant_identity:
         error_msg = f"SIP Error: {e.message}"
         if e.metadata:
             sip_status = e.metadata.get('sip_status', 'Unknown')
-            error_msg += f" - SIP Status: {sip_status}"
+            error_msg += f" (SIP: {sip_status})"
         
-        logger.error(f"Error creating SIP participant: {error_msg}")
+        logger.error(error_msg)
         
         await insert_call_start_async(
             ctx.room.name, agent_name, "Failed to initiate", dial_info,

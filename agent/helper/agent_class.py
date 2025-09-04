@@ -109,19 +109,6 @@ class MysyaraAgent(Agent):
                 {"agent": agent_name}
             )
 
-    # async def on_user_turn_completed(
-    #     self, turn_ctx: ChatContext, new_message: ChatMessage,
-    # ) -> None:
-    #     """Called when user completes a turn - enriches with RAG content"""
-    #     # Import here to avoid circular imports
-    #     from .rag_connector import enrich_with_rag
-        
-    #     rag_content = await enrich_with_rag('/n'.join(new_message.content))
-    #     turn_ctx.add_message(
-    #         role="assistant", 
-    #         content=f"Additional information relevant to the user's next message: {rag_content}"
-    #     )
-    #     await self.update_chat_ctx(turn_ctx)
     @function_tool
     async def search_mysyara_knowledge_base(self, context: RunContext, query: str):
         """
@@ -230,12 +217,6 @@ class MysyaraAgent(Agent):
         logger.info("Booking appointment initiated")
         return "I'll help you book an appointment. Let me get the available slots for you."
     
-    # @function_tool()
-    # async def get_service_pricing(self, ctx: RunContext):
-    #     """Get pricing information for services"""
-    #     # This can be expanded with actual pricing logic
-    #     logger.info("Service pricing requested")
-    #     return "Let me get you the latest pricing information for our services."
 
 def create_mysyara_agent(name: str, appointment_time: str, dial_info: dict[str, Any], 
                         call_state: CallState, prompt_path: str) -> MysyaraAgent:

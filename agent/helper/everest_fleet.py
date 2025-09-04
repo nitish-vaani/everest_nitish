@@ -381,8 +381,8 @@ class GreeterAgent(Agent):
         _prompt = _prompt.replace("{{phone}}", self.contact_number)
         _prompt = _prompt.replace("{{name}}", self.customer_name)
         _prompt = _prompt.replace("{{current_time}}", datetime.now().strftime("%Y-%m-%d %H:%M"))
-        logger.info(f"Greeter Prompt: \n{_prompt}")
-        logger.info("-"*30)
+        # logger.info(f"Greeter Prompt: \n{_prompt}")
+        # logger.info("-"*30)
         self._seen_results = set()
         self.call_state = call_state
         self.llm_obj = LLMPromptRunner(api_key=config_manager.get_openai_api_key())
@@ -492,8 +492,8 @@ class DisInterestHandlerAgent(Agent):
         _prompt = disinterest_handler_prompt
         _prompt = _prompt.replace("{{phone}}", self.contact_number)
         _prompt = _prompt.replace("{{current_time}}", datetime.now().strftime("%Y-%m-%d %H:%M"))
-        logger.info(f"DisInterestHandlerAgent Prompt: \n{_prompt}")
-        logger.info("-"*30)
+        # logger.info(f"DisInterestHandlerAgent Prompt: \n{_prompt}")
+        # logger.info("-"*30)
         self._seen_results = set()
         self.call_state = call_state
         self.llm_obj = LLMPromptRunner(api_key=config_manager.get_openai_api_key())
@@ -552,8 +552,8 @@ class IntakeUserInfoAgent(Agent):
         _prompt = intake_prompt
         _prompt = _prompt.replace("{{phone}}", self.contact_number)
         _prompt = _prompt.replace("{{current_time}}", datetime.now().strftime("%Y-%m-%d %H:%M"))
-        logger.info(f"Greeter Prompt: \n{_prompt}")
-        logger.info("-"*30)
+        # logger.info(f"Greeter Prompt: \n{_prompt}")
+        # logger.info("-"*30)
         self._seen_results = set()
         self.call_state = call_state
         self.llm_obj = LLMPromptRunner(api_key=config_manager.get_openai_api_key())
