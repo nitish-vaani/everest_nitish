@@ -62,7 +62,7 @@ Transcript:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a professional conversation summarizer for a flight booking service. Your task is to analyse the conversation transcript and pick out the key points discussed between the user and the agent. Summary should be crisp, concise and clear."
+                    "content": "You are a professional conversation summarizer. Your task is to analyse the conversation transcript and pick out the key points discussed between the user and the agent. Summary should be crisp, concise and clear."
                 },
                 {
                     "role": "user",

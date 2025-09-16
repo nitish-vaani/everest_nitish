@@ -34,7 +34,7 @@ import random
 # Load environment variables
 load_dotenv(dotenv_path="/app/.env.local")
 SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", "./backend/test.db")
-
+INCOMING_ID = 100
 # Create tables in the database
 Base.metadata.create_all(bind=engine)
 
@@ -46,7 +46,7 @@ logger = logging.getLogger("api")
 
 app = FastAPI(title="LiveKit Dispatch API with Dashboard") 
 open_ai_api = os.getenv("OPENAI_API_KEY")
-BASE_URL = "https://lk-backend3.vaaniresearch.com"
+BASE_URL = "https://ef-bk.vaaniresearch.com"
 client_name = os.getenv("CLIENT_NAME")
 print(f"Client Name: {client_name}")
 
@@ -460,29 +460,111 @@ async def create_dispatch(fastapi_request: Request, db: Session = Depends(get_da
         raise HTTPException(status_code=500, detail=f"Error creating dispatch: {str(e)}")
 
 #Data APIs
+# @app.get("/api/call-history/{user_id}/{client_name}")
+# async def get_call_history(user_id: int, client_name: str, db: Session = Depends(get_database)):
+#     try:
+#         import time
+#         start_time_total = time.time()
+#         call_history = db.query(models.Call).filter(models.Call.user_id == user_id).all()
+#         print(f"time taken to fetch call history: {time.time() - start_time_total} seconds")
+
+        
+#         # for call in call_history:
+#         #     if call.call
+#         #     print(f"Call ID: {call.call_id}, Name: {call.name}, Status: {call.call_status}, Started At: {call.call_started_at}, Ended At: {call.call_ended_at}, Call Type: {call.call_type}, Duration: {call.call_duration}, From: {call.call_from}, To: {call.call_to}")
+#         #     print(f"##############################")
+#         # print(f"Total calls fetched: {len(call_history)}")
+#         # print(f"Time taken to fetch call history: {time.time() - start_time_total} seconds")
+        
+#         curated_response = []
+#         for call in call_history:
+#             updated_call = {}
+#             conversation_id = call.call_id
+            
+#             start_time = time.time()
+#             # call_data_row = get_call_by_room(conversation_id)
+#             call_data_row = call
+            
+#             if call_data_row is None:  # This is to tackle the old data.
+#                 # FIXED: Use call_status instead of call_completed
+#                 if call.call_status == "ended":
+#                     call_status = "ended"
+#                 else:
+#                     call_status = "Ongoing"
+                
+#                 updated_call['Name'] = {'name': call.name}
+#                 updated_call['Start_time'] = call.call_started_at
+#                 updated_call['End_time'] = call.call_ended_at if call.call_ended_at else call.call_started_at
+#                 updated_call['recording_api'] = f"{BASE_URL}/api/stream/{call.call_id}"
+#                 updated_call['call_details'] = f"{BASE_URL}/api/call_details/{client_name}/{user_id}/{call.call_id}"
+#                 updated_call['call_type'] = call.call_type
+#                 updated_call['call_status'] = call_status
+#                 updated_call['from_number'] = call.call_from
+#                 updated_call['to_number'] = call.call_to
+#                 updated_call['direction'] = call.call_type
+#                 updated_call['duration_ms'] = call.call_duration
+
+#             else:
+#                 # Get the duration of the call in ms
+#                 print("Getting here")
+#                 if call_data_row.get('ended_at') is None and call_data_row.get('status') in ["started", "Call rejected", "Not picked"]:
+#                     duration = 0
+#                 else:
+#                     started_at_str = call_data_row.get('started_at')
+#                     ended_at_str = call_data_row.get('ended_at')
+
+#                     if started_at_str and ended_at_str:
+#                         started_at = datetime.fromisoformat(started_at_str)
+#                         ended_at = datetime.fromisoformat(ended_at_str)
+#                         duration = (ended_at - started_at).total_seconds() * 1000  # duration in milliseconds
+#                     else:
+#                         duration = 0
+
+#                 updated_call['Name'] = {'name': call.name}
+#                 updated_call['Start_time'] = call_data_row.get('started_at')
+#                 updated_call['End_time'] = call_data_row.get('ended_at', call.call_started_at)
+#                 updated_call['recording_api'] = f"{BASE_URL}/api/stream/{call.call_id}"
+#                 updated_call['call_details'] = f"{BASE_URL}/api/call_details/{client_name}/{user_id}/{call.call_id}"
+#                 updated_call['call_type'] = call.call_type
+#                 updated_call['call_status'] = call_data_row.get('status', 'Unknown')
+#                 updated_call['from_number'] = call.call_from
+#                 updated_call['to_number'] = call.call_to
+#                 updated_call['direction'] = call.call_type
+#                 updated_call['duration_ms'] = duration
+            
+        
+#             curated_response.append(updated_call)
+#             print(f"time taken to process each call: {time.time() - start_time} seconds")
+
+#         reversed_list = curated_response[::-1]
+#         time_taken_total = time.time() - start_time_total
+#         print(f"Total time taken to fetch call history: {time_taken_total} seconds")
+#         # print(f"Reversed list: {reversed_list}")
+#         return reversed_list
+        
+#     except (OperationalError, DisconnectionError) as e:
+#         logger.warning(f"Database connection issue in get_call_history: {e}")
+#         raise HTTPException(status_code=503, detail="Database connection issue, please try again")
+#     except Exception as e:
+#         logger.error(f"Error fetching call history: {e}")
+#         raise HTTPException(status_code=500, detail=f"Error fetching call history: {str(e)}")
+
 @app.get("/api/call-history/{user_id}/{client_name}")
 async def get_call_history(user_id: int, client_name: str, db: Session = Depends(get_database)):
     try:
         import time
+        from datetime import datetime
+        
         start_time_total = time.time()
-        call_history = db.query(models.Call).filter(models.Call.user_id == user_id).all()
-        print(f"time taken to fetch call history: {time.time() - start_time_total} seconds")
+        call_history = db.query(models.Call).filter(models.Call.user_id.in_([INCOMING_ID, user_id])).all()
+        # print(f"time taken to fetch call history: {time.time() - start_time_total} seconds")
 
-        
-        # for call in call_history:
-        #     if call.call
-        #     print(f"Call ID: {call.call_id}, Name: {call.name}, Status: {call.call_status}, Started At: {call.call_started_at}, Ended At: {call.call_ended_at}, Call Type: {call.call_type}, Duration: {call.call_duration}, From: {call.call_from}, To: {call.call_to}")
-        #     print(f"##############################")
-        # print(f"Total calls fetched: {len(call_history)}")
-        # print(f"Time taken to fetch call history: {time.time() - start_time_total} seconds")
-        
         curated_response = []
         for call in call_history:
             updated_call = {}
             conversation_id = call.call_id
             
             start_time = time.time()
-            # call_data_row = get_call_by_room(conversation_id)
             call_data_row = call
             
             if call_data_row is None:  # This is to tackle the old data.
@@ -506,39 +588,68 @@ async def get_call_history(user_id: int, client_name: str, db: Session = Depends
 
             else:
                 # Get the duration of the call in ms
-                if call_data_row.get('ended_at') is None and call_data_row.get('status') in ["started", "Call rejected", "Not picked"]:
+                # FIXED: Replace .get() calls with direct attribute access
+                if call_data_row.call_ended_at is None and call_data_row.call_status in ["started", "Call rejected", "Not picked"]:
                     duration = 0
                 else:
-                    started_at_str = call_data_row.get('started_at')
-                    ended_at_str = call_data_row.get('ended_at')
+                    started_at_str = call_data_row.call_started_at
+                    ended_at_str = call_data_row.call_ended_at
+
+                    def safe_parse_datetime(dt_value):
+                        """Safely parse datetime value to datetime object"""
+                        if dt_value is None:
+                            return None
+                        
+                        # If it's already a datetime object, return it
+                        if isinstance(dt_value, datetime):
+                            return dt_value
+                        
+                        # If it's a string, try to parse it
+                        if isinstance(dt_value, str):
+                            try:
+                                return datetime.fromisoformat(dt_value.replace('Z', '+00:00'))
+                            except ValueError:
+                                # Try other common formats if ISO format fails
+                                try:
+                                    return datetime.strptime(dt_value, '%Y-%m-%d %H:%M:%S')
+                                except ValueError:
+                                    print(f"Warning: Could not parse datetime string: {dt_value}")
+                                    return None
+                        
+                        # If it's neither datetime nor string, log and return None
+                        print(f"Warning: Unexpected datetime type: {type(dt_value)} with value: {dt_value}")
+                        return None
 
                     if started_at_str and ended_at_str:
-                        started_at = datetime.fromisoformat(started_at_str)
-                        ended_at = datetime.fromisoformat(ended_at_str)
-                        duration = (ended_at - started_at).total_seconds() * 1000  # duration in milliseconds
+                        started_at = safe_parse_datetime(started_at_str)
+                        ended_at = safe_parse_datetime(ended_at_str)
+                        
+                        if started_at and ended_at:
+                            duration = (ended_at - started_at).total_seconds() * 1000  # duration in milliseconds
+                        else:
+                            duration = 0
                     else:
                         duration = 0
 
                 updated_call['Name'] = {'name': call.name}
-                updated_call['Start_time'] = call_data_row.get('started_at')
-                updated_call['End_time'] = call_data_row.get('ended_at', call.call_started_at)
+                updated_call['Start_time'] = call_data_row.call_started_at  # Keep original format
+                updated_call['End_time'] = call_data_row.call_ended_at if call_data_row.call_ended_at else call.call_started_at
                 updated_call['recording_api'] = f"{BASE_URL}/api/stream/{call.call_id}"
                 updated_call['call_details'] = f"{BASE_URL}/api/call_details/{client_name}/{user_id}/{call.call_id}"
                 updated_call['call_type'] = call.call_type
-                updated_call['call_status'] = call_data_row.get('status', 'Unknown')
+                # FIXED: Replace .get() with direct attribute access
+                updated_call['call_status'] = call_data_row.call_status if call_data_row.call_status else "NA"
                 updated_call['from_number'] = call.call_from
                 updated_call['to_number'] = call.call_to
                 updated_call['direction'] = call.call_type
                 updated_call['duration_ms'] = duration
             
-        
             curated_response.append(updated_call)
-            print(f"time taken to process each call: {time.time() - start_time} seconds")
+            # print(f"time taken to process each call: {time.time() - start_time} seconds")
 
         reversed_list = curated_response[::-1]
         time_taken_total = time.time() - start_time_total
-        print(f"Total time taken to fetch call history: {time_taken_total} seconds")
-        # print(f"Reversed list: {reversed_list}")
+        #print(f"Total time taken to fetch call history: {time_taken_total} seconds")
         return reversed_list
         
     except (OperationalError, DisconnectionError) as e:
@@ -547,6 +658,7 @@ async def get_call_history(user_id: int, client_name: str, db: Session = Depends
     except Exception as e:
         logger.error(f"Error fetching call history: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching call history: {str(e)}")
+
 
 @app.get("/api/transcript/{call_id}")
 async def get_transcript(call_id: str, db: Session = Depends(get_database)):
@@ -565,7 +677,8 @@ async def get_transcript(call_id: str, db: Session = Depends(get_database)):
         print(f"S3 Bucket: {s3_bucket}")
         s3_connector = S3Connector(s3_bucket)
         year, month = get_month_year_from_datetime(str(call.call_started_at))
-        transcript_path = f"transcripts/{client_name}/{year}/{month}/{call_id}.txt"
+        # transcript_path = f"transcripts/{client_name}/{year}/{month}/{call_id}.txt"
+        transcript_path = f"transcripts/mysyara/{year}/{month}/{call_id}.txt"
         print(f"Transcript path: {transcript_path}")
             
         # Get the transcript asynchronously
@@ -622,62 +735,8 @@ async def get_transcript(call_id: str, db: Session = Depends(get_database)):
     except Exception as e:
         return {"transcript": "Error retrieving transcript", "status_code": 500, "function": "get_transcript(exception)", "error": str(e)}
 
-# @app.get("/api/stream/{call_id}")
-# async def stream_audio(call_id: str, db: Session = Depends(get_database)):
-#     """
-#     Stream audio file from S3
-#     """
-#     try:
-#         # Find the call
-#         call = db.query(models.Call).filter(models.Call.call_id == call_id).first()
-#         if not call:
-#             raise HTTPException(status_code=404, detail=f"Call with ID {call_id} not found")
-        
-#         # Construct the recording path based on your pattern
-#         recording_path = f"{call_id}.mp3"
-        
-#         # Get S3 bucket
-#         s3_bucket = os.getenv("AWS_BUCKET")
-#         print(f"S3 Bucket: {s3_bucket}")
-#         s3_connector = S3Connector(s3_bucket)
-        
-#         # Get the audio file asynchronously
-#         path_of_recording = f"mp3/{recording_path}"
-#         audio_bytes = await s3_connector.fetch_file_async(path_of_recording)
-#         print(f"Audio bytes fetched: {audio_bytes is not None}")
-
-#         if audio_bytes is None:
-#             print(f"Audio file not found in S3 for call_id: {call_id}")
-#             raise HTTPException(status_code=404, detail="Audio file not found in S3")
-        
-#         # Create an async generator to stream the content
-#         async def stream_audio_content():
-#             yield audio_bytes
-        
-#         # Set content type for M3U8 or MP3
-#         if recording_path.endswith(".m3u8"):
-#             content_type = "application/vnd.apple.mpegurl"
-#         elif recording_path.endswith(".mp3"):
-#             content_type = "audio/mpeg"
-#         else:
-#             raise HTTPException(status_code=400, detail="Unsupported file type")
-        
-#         return StreamingResponse(
-#             stream_audio_content(),
-#             media_type=content_type
-#         )
-    
-#     except HTTPException:
-#         raise  # Re-raise HTTP exceptions as-is
-#     except (OperationalError, DisconnectionError) as e:
-#         logger.warning(f"Database connection issue in stream_audio: {e}")
-#         raise HTTPException(status_code=503, detail="Database connection issue, please try again")
-#     except Exception as e:
-#         logger.error(f"Error streaming audio: {e}")
-#         raise HTTPException(status_code=500, detail=f"Error streaming audio: {str(e)}")
-
 @app.get("/api/stream/{call_id}")
-async def stream_audio(call_id: str):  # Remove db dependency
+async def stream_audio(call_id: str):
     """
     Stream audio file from S3
     """
